@@ -34,7 +34,7 @@ struct Putdata
 	std::string email;
 	std::string first_name;
 	std::string last_name;
-}
+};
 
 struct jwt_data
 {

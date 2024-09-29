@@ -122,30 +122,20 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 
 
         // Convert the result to JSON
-        json json_result = json::array();{
-		try
-		{
-			Putdata data = parse_put(req.body());
-			auto auth_header = req.base()["Authorization"]
-			std::string token = auth_header.to_string().substr(7);
+        json json_result = json::array();
+			for (const auto& row : result)
+			{
+				json json_row;
+				for (const auto& field : row)
+				{
+					json_row[field.name()] = field.c_str();
+				}
+				json_result.push_back(json_row);
 
-			jwt_data token_data = jwt_checker(token);
-
-			auto conn = connection_pool.acquire();
-	        pqxx::work txn(*conn);
-
-			conn->prepare("put_user_data", "UPDATE users SET username = $1, email = $2, password = $3, first_name = $4, last_name = $5 WHERE id = $6");
-
-			pqxx::result result = txn.exec_prepared("put_user_data", data.username, data.password, data.email, data.first_name, data.last_name, token_data.user_id);
-
-			std::cout << GREEN_TEXT << "[PUT]" << RESET_COLOR << ": Usuario " << token_data.user_id << "atualizou seu perfil!" << std::endl;
-
-			res.result(http::status::bad_request);
-			res.set(http::field::content_type, "application/json");
-			res.body() = "Dados atualizados!";
-		}
+				// Commit the transaction
 				txn.commit();
 
+				// Send the response
 				res.result(http::status::ok);
 				res.set(http::field::content_type, "application/json");
 				res.body() = json_result.dump();
@@ -164,7 +154,7 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 		try
 		{
 			Putdata data = parse_put(req.body());
-			auto auth_header = req.base()["Authorization"]
+			auto auth_header = req.base()["Authorization"];
 			std::string token = auth_header.to_string().substr(7);
 
 			jwt_data token_data = jwt_checker(token);
@@ -175,6 +165,8 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 			conn->prepare("put_user_data", "UPDATE users SET username = $1, email = $2, password = $3, first_name = $4, last_name = $5 WHERE id = $6");
 
 			pqxx::result result = txn.exec_prepared("put_user_data", data.username, data.password, data.email, data.first_name, data.last_name, token_data.user_id);
+
+			txn.commit();
 
 			std::cout << GREEN_TEXT << "[PUT]" << RESET_COLOR << ": Usuario " << token_data.user_id << "atualizou seu perfil!" << std::endl;
 
