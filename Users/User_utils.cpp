@@ -23,11 +23,6 @@ company_id VARCHAR(255) NOT NULL);
 using json = nlohmann::json;
 extern ConnectionPool connection_pool;
 
-namespace beast = boost::beast;
-namespace http = beast::http;
-namespace net = boost::asio;
-using tcp = net::ip::tcp;
-
 Postdata parse_post(const std::string req_body)
 {
 	Postdata result;
@@ -38,6 +33,24 @@ Postdata parse_post(const std::string req_body)
     };
     result.username = get_string("username", "");
 	result.password = get_string("password", "");
+	return result;
+}
+
+Putdata parse_put(const std::string req_body)
+{
+	Putdata result;
+	json data_body = json::parse(req_body);
+
+    auto get_string = [&](const std::string& key, const std::string& default_value) {
+        return data_body.contains(key) && !data_body[key].is_null() ? data_body[key].get<std::string>() : default_value;
+    };
+
+	result.username = get_string("username", "");
+	result.password = get_string("password", "");
+	result.email = get_string("email", "");
+	result.first_name = get_string("first_name", "");
+	result.last_name = get_string("last_name", "");
+
 	return result;
 }
 
@@ -52,15 +65,11 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 			Postdata data = parse_post(req.body());
 			std::cout << GREEN_TEXT << "[POST]" << RESET_COLOR << ": " << req.body() << std::endl;
 
-            // Acquire a connection from the pool
             auto conn = connection_pool.acquire();
-            pqxx::work txn(*conn); // Start a transaction
+            pqxx::work txn(*conn);
 
-            // Example database operation
-			// Prepare the statement with the correct SQL syntax
             conn->prepare("verify_user", "SELECT * FROM users WHERE username = $1 AND password = $2");
 
-            // Execute the prepared statement with parameters using exec_prepared
             pqxx::result result = txn.exec_prepared("verify_user", data.username, data.password);
 
 			if (result.size() == 1)
@@ -81,7 +90,6 @@ void handle_request(http::request<http::string_body> const& req, http::response<
                 res.body() = R"({"message": "Invalid username or password"})";
             }
 
-            // Commit the transaction
             txn.commit();
         }
         catch (const std::exception& e)
@@ -114,20 +122,30 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 
 
         // Convert the result to JSON
-        json json_result = json::array();
-			for (const auto& row : result)
-			{
-				json json_row;
-				for (const auto& field : row)
-				{
-					json_row[field.name()] = field.c_str();
-				}
-				json_result.push_back(json_row);
+        json json_result = json::array();{
+		try
+		{
+			Putdata data = parse_put(req.body());
+			auto auth_header = req.base()["Authorization"]
+			std::string token = auth_header.to_string().substr(7);
 
-				// Commit the transaction
+			jwt_data token_data = jwt_checker(token);
+
+			auto conn = connection_pool.acquire();
+	        pqxx::work txn(*conn);
+
+			conn->prepare("put_user_data", "UPDATE users SET username = $1, email = $2, password = $3, first_name = $4, last_name = $5 WHERE id = $6");
+
+			pqxx::result result = txn.exec_prepared("put_user_data", data.username, data.password, data.email, data.first_name, data.last_name, token_data.user_id);
+
+			std::cout << GREEN_TEXT << "[PUT]" << RESET_COLOR << ": Usuario " << token_data.user_id << "atualizou seu perfil!" << std::endl;
+
+			res.result(http::status::bad_request);
+			res.set(http::field::content_type, "application/json");
+			res.body() = "Dados atualizados!";
+		}
 				txn.commit();
 
-				// Send the response
 				res.result(http::status::ok);
 				res.set(http::field::content_type, "application/json");
 				res.body() = json_result.dump();
@@ -140,6 +158,35 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 			res.set(http::field::content_type, "application/json");
 			res.body() = "Database error: " + std::string(e.what());
 		}
+	}
+	else if (req.method() == http::verb::put)
+	{
+		try
+		{
+			Putdata data = parse_put(req.body());
+			auto auth_header = req.base()["Authorization"]
+			std::string token = auth_header.to_string().substr(7);
+
+			jwt_data token_data = jwt_checker(token);
+
+			auto conn = connection_pool.acquire();
+	        pqxx::work txn(*conn);
+
+			conn->prepare("put_user_data", "UPDATE users SET username = $1, email = $2, password = $3, first_name = $4, last_name = $5 WHERE id = $6");
+
+			pqxx::result result = txn.exec_prepared("put_user_data", data.username, data.password, data.email, data.first_name, data.last_name, token_data.user_id);
+
+			std::cout << GREEN_TEXT << "[PUT]" << RESET_COLOR << ": Usuario " << token_data.user_id << "atualizou seu perfil!" << std::endl;
+
+			res.result(http::status::bad_request);
+			res.set(http::field::content_type, "application/json");
+			res.body() = "Dados atualizados!";
+		}
+		catch(const std::exception& e)
+		{
+			std::cerr << e.what() << '\n';
+		}
+
 	}
     else
     {
