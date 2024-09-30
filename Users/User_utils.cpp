@@ -100,7 +100,62 @@ void handle_request(http::request<http::string_body> const& req, http::response<
             res.body() = "Database error: " + std::string(e.what());
         }
     }
-	else if (req.method() == http::verb::get)
+	//SE NAO FUNCIONAR, UTILIZAR START_WITH IMPLEMENTADA NO MICROSERVICO CARGAS_INFO
+	// LEMBRAR DE ADICIONAR PERMISSAO EM JWT_DATA E AUTH_UTILS E ADICIONAR COMPARACAO NESSE IF
+	else if (req.method() == http::verb::get && req.target().to_string().starts_with("/id="))
+	{
+		try
+		{
+
+		std::cout << GREEN_TEXT << "[ARGUMENTO RECEBIDO]" << RESET_COLOR << ": " << req.target() << std::endl;
+
+		auto auth_header = req.base()["Authorization"];
+		if (auth_header == "")
+			throw std::runtime_error("Token nao encontrado!");
+        std::string token = auth_header.to_string().substr(7); //SUBSTR depois de bearer
+
+		/* std::cout << GREEN_TEXT << "[JWT TOKEN]" << RESET_COLOR << ": " << token << std::endl; */
+
+		jwt_data token_data = jwt_checker(token);
+
+
+		auto conn = connection_pool.acquire();
+        pqxx::work txn(*conn);
+
+		conn->prepare("get_user_data", "SELECT * FROM users WHERE id = $1");
+
+
+		pqxx::result result = txn.exec_prepared("get_user_data", token_data.user_id);
+
+
+        json json_result = json::array();
+			for (const auto& row : result)
+			{
+				json json_row;
+				for (const auto& field : row)
+				{
+					json_row[field.name()] = field.c_str();
+				}
+				json_result.push_back(json_row);
+
+
+				// Send the response
+				res.result(http::status::ok);
+				res.set(http::field::content_type, "application/json");
+				res.body() = json_result.dump();
+			}
+			txn.commit();
+			connection_pool.release(conn);
+			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
+        }
+		catch (const std::exception& e)
+		{
+			res.result(http::status::bad_request);
+			res.set(http::field::content_type, "application/json");
+			res.body() = "Database error: " + std::string(e.what());
+		}
+	}
+		else if (req.method() == http::verb::get)
 	{
 		try
 		{
@@ -135,7 +190,6 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 				json_result.push_back(json_row);
 
 
-				// Send the response
 				res.result(http::status::ok);
 				res.set(http::field::content_type, "application/json");
 				res.body() = json_result.dump();

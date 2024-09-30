@@ -6,16 +6,17 @@
 /* g++ -std=c++17 -o server main.cpp User_utils.cpp Auth_utils.cpp -lboost_system -lpthread -lpqxx -lpq -Ithird_party/jwt-cpp/include -lcrypto
  */
 
+// LEMBRAR DE MODIFICAR CREDENCIAIS PARA DB DO MICROSERVICO
 ConnectionPool connection_pool("host=localhost port=5432 dbname=mydatabase user=myuser password=mypassword", 10);
 
 #define PORTA 8001
 
+// FAZENDO LISTENING POR RECURSAO
 void start_accepting(net::io_context& ioc, tcp::acceptor& acceptor) {
     acceptor.async_accept([&](boost::system::error_code ec, tcp::socket socket) {
         if (!ec) {
             std::thread(do_session, std::move(socket)).detach(); // Usa nova thread ou conexao
         }
-
         start_accepting(ioc, acceptor);
     });
 }

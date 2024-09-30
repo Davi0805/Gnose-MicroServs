@@ -60,9 +60,12 @@ Postdata parse_post(const std::string req_body)
 	Postdata result;
 	json data_body = json::parse(req_body);
 
+
+	//OBJECT PARSER DA LIB NLOHMANN JSON
     auto get_string = [&](const std::string& key, const std::string& default_value) {
         return data_body.contains(key) && !data_body[key].is_null() ? data_body[key].get<std::string>() : default_value;
     };
+
     result.costumer = get_string("costumer", "unknown");
 	result.company_id = get_string("company_id", "");
     result.shipping_status = get_string("shipping_status", "pending");
@@ -89,6 +92,8 @@ Postdata parse_post(const std::string req_body)
 	return result;
 }
 
+
+//PROVAVELMENTE POSSO SUBSTITUIR ESSA FUNCAO POR REQ.TARGET().TO_STRING().START_WITH("/id=")
 bool starts_with(boost::beast::string_view original, std::string prefix)
 {
 	std::string buffer(original.data(), original.size());

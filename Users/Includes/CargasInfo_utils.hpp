@@ -84,7 +84,7 @@ public:
     }
 
     std::shared_ptr<pqxx::connection> acquire() {
-        semaphore_.acquire();  // Espera até que haja uma conexão disponível
+        semaphore_.acquire();
         std::lock_guard<std::mutex> lock(mtx_);
 
         auto conn = connections_.back();
@@ -97,7 +97,7 @@ public:
             std::lock_guard<std::mutex> lock(mtx_);
             connections_.push_back(conn);
         }
-        semaphore_.release();  // Libera o semáforo para indicar que há uma conexão disponível
+        semaphore_.release();
     }
 
 private:

@@ -33,14 +33,14 @@ jwt_data jwt_checker(const std::string& token) {
 
     auto exp = decoded.get_expires_at();
     if (exp < std::chrono::system_clock::now()) {
-        throw std::runtime_error("Token has expired");
+        throw std::runtime_error("Token expirado");
     }
 
     result.user_id = decoded.get_payload_claim("id").as_string();
     result.company_id = decoded.get_payload_claim("company_id").as_string();
 }
 catch (const jwt::error::token_verification_exception& e) {
-    std::cerr << "JWT Verification failed: " << e.what() << std::endl;
+    std::cerr << "Verificacao do tokem falhou: " << e.what() << std::endl;
     throw;
 }
 return result;
