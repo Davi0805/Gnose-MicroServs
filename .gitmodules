@@ -1,3 +1,7 @@
-[submodule "Users/third_party/jwt-cpp"]
-	path = Users/third_party/jwt-cpp
+[submodule "Users/Includes/third_party/jwt-cpp"]
+	path = Users/Includes/third_party/jwt-cpp
+	url = https://github.com/Thalhammer/jwt-cpp
+
+[submodule "Cargas_info/Includes/third_party/jwt-cpp"]
+	path = Cargas_info/Includes/third_party/jwt-cpp
 	url = https://github.com/Thalhammer/jwt-cpp
