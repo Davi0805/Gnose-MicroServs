@@ -91,6 +91,7 @@ void handle_request(http::request<http::string_body> const& req, http::response<
             }
 
             txn.commit();
+			connection_pool.release(conn);
         }
         catch (const std::exception& e)
         {
@@ -105,6 +106,8 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 		{
 
 		auto auth_header = req.base()["Authorization"];
+		if (auth_header == "")
+			throw std::runtime_error("Token nao encontrado!");
         std::string token = auth_header.to_string().substr(7); //SUBSTR depois de bearer
 
 		/* std::cout << GREEN_TEXT << "[JWT TOKEN]" << RESET_COLOR << ": " << token << std::endl; */
@@ -121,7 +124,6 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 		pqxx::result result = txn.exec_prepared("get_user_data", token_data.user_id);
 
 
-        // Convert the result to JSON
         json json_result = json::array();
 			for (const auto& row : result)
 			{
@@ -132,14 +134,14 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 				}
 				json_result.push_back(json_row);
 
-				// Commit the transaction
-				txn.commit();
 
 				// Send the response
 				res.result(http::status::ok);
 				res.set(http::field::content_type, "application/json");
 				res.body() = json_result.dump();
 			}
+			txn.commit();
+			connection_pool.release(conn);
 			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
         }
 		catch (const std::exception& e)
@@ -155,6 +157,8 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 		{
 			Putdata data = parse_put(req.body());
 			auto auth_header = req.base()["Authorization"];
+			if (auth_header == "")
+				throw std::runtime_error("Token nao encontrado!");
 			std::string token = auth_header.to_string().substr(7);
 
 			jwt_data token_data = jwt_checker(token);
@@ -164,19 +168,22 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 
 			conn->prepare("put_user_data", "UPDATE users SET username = $1, email = $2, password = $3, first_name = $4, last_name = $5 WHERE id = $6");
 
-			pqxx::result result = txn.exec_prepared("put_user_data", data.username, data.password, data.email, data.first_name, data.last_name, token_data.user_id);
+			pqxx::result result = txn.exec_prepared("put_user_data", data.username, data.email, data.password, data.first_name, data.last_name, token_data.user_id);
 
 			txn.commit();
+			connection_pool.release(conn);
 
-			std::cout << GREEN_TEXT << "[PUT]" << RESET_COLOR << ": Usuario " << token_data.user_id << "atualizou seu perfil!" << std::endl;
+			std::cout << GREEN_TEXT << "[PUT]" << RESET_COLOR << ": Usuario " << token_data.user_id << " atualizou seu perfil!" << std::endl;
 
-			res.result(http::status::bad_request);
+			res.result(http::status::ok);
 			res.set(http::field::content_type, "application/json");
 			res.body() = "Dados atualizados!";
 		}
 		catch(const std::exception& e)
 		{
-			std::cerr << e.what() << '\n';
+			res.result(http::status::bad_request);
+			res.set(http::field::content_type, "application/json");
+			res.body() = "Database error: " + std::string(e.what());
 		}
 
 	}

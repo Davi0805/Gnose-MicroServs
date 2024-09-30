@@ -10,6 +10,8 @@
 #include <pqxx/pqxx>
 #include <condition_variable>
 #include <string>
+#include <semaphore>
+#include <thread>
 
 #define GREEN_TEXT "\033[32m"
 #define RESET_COLOR "\033[0m"
@@ -44,7 +46,7 @@ struct jwt_data
 
 
 
-class ConnectionPool {
+/* class ConnectionPool {
 public:
     ConnectionPool(const std::string& connection_string, size_t pool_size) {
         for (size_t i = 0; i < pool_size; ++i) {
@@ -70,6 +72,40 @@ private:
     std::queue<std::unique_ptr<pqxx::connection>> connections;
     std::mutex mutex_;
     std::condition_variable condition_;
+}; */
+
+class ConnectionPool {
+public:
+    ConnectionPool(const std::string& conn_info, std::size_t pool_size)
+        : conn_info_(conn_info), pool_size_(pool_size), semaphore_(pool_size) {
+        for (std::size_t i = 0; i < pool_size_; ++i) {
+            connections_.push_back(std::make_shared<pqxx::connection>(conn_info_));
+        }
+    }
+
+    std::shared_ptr<pqxx::connection> acquire() {
+        semaphore_.acquire();  // Espera até que haja uma conexão disponível
+        std::lock_guard<std::mutex> lock(mtx_);
+
+        auto conn = connections_.back();
+        connections_.pop_back();
+        return conn;
+    }
+
+    void release(std::shared_ptr<pqxx::connection> conn) {
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            connections_.push_back(conn);
+        }
+        semaphore_.release();  // Libera o semáforo para indicar que há uma conexão disponível
+    }
+
+private:
+    std::string conn_info_;
+    std::size_t pool_size_;
+    std::vector<std::shared_ptr<pqxx::connection>> connections_;
+    std::mutex mtx_;
+    std::counting_semaphore<> semaphore_;
 };
 
 void handle_request(http::request<http::string_body> const& req, http::response<http::string_body>& res);

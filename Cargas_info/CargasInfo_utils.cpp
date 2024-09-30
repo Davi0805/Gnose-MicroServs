@@ -89,6 +89,12 @@ Postdata parse_post(const std::string req_body)
 	return result;
 }
 
+bool starts_with(boost::beast::string_view original, std::string prefix)
+{
+	std::string buffer(original.data(), original.size());
+	return buffer.rfind(prefix, 0) == 0;
+}
+
 
 void handle_request(http::request<http::string_body> const& req, http::response<http::string_body>& res)
 {
@@ -96,24 +102,25 @@ void handle_request(http::request<http::string_body> const& req, http::response<
     {
         try
         {
-            // Here you would parse the request body if needed
-            /* json data_body = json::parse(req.body()); */
+			auto auth_header = req.base()["Authorization"];
+			if (auth_header == "")
+				throw std::runtime_error("Token nao encontrado!");
+
+			std::string token = auth_header.to_string().substr(7);
+			jwt_data token_data = jwt_checker(token);
+
 			Postdata data = parse_post(req.body());
-			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << req.body() << std::endl;
+			std::cout << GREEN_TEXT << "[POST]" << RESET_COLOR << ": " << req.body() << std::endl;
 
-            // Acquire a connection from the pool
             auto conn = connection_pool.acquire();
-            pqxx::work txn(*conn); // Start a transaction
+            pqxx::work txn(*conn); //INICIA COMUNICACAO
 
-            // Example database operation
-			// Prepare the statement with the correct SQL syntax
             conn->prepare("insert_shipments", "INSERT INTO shipments (costumer, company_id, shipping_status, type_of_load, origin, destination, weight, cost) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)");
 
-            // Execute the prepared statement with parameters using exec_prepared
             txn.exec_prepared("insert_shipments", data.costumer, data.company_id, data.shipping_status, data.type_of_load, data.origin, data.destination, data.weight, data.cost);
 
-            // Commit the transaction
             txn.commit();
+			connection_pool.release(conn);
 
             res.result(http::status::ok);
             res.set(http::field::content_type, "application/json");
@@ -126,17 +133,28 @@ void handle_request(http::request<http::string_body> const& req, http::response<
             res.body() = "Database error: " + std::string(e.what());
         }
     }
-	else if (req.method() == http::verb::get)
+	else if (req.method() == http::verb::get && starts_with(req.target(), "/id="))
 	{
 		try
 		{
+		auto auth_header = req.base()["Authorization"];
+		if (auth_header == "")
+			throw std::runtime_error("Token nao encontrado!");
+
+		std::string token = auth_header.to_string().substr(7);
+		jwt_data token_data = jwt_checker(token);
+
 		auto conn = connection_pool.acquire();
         pqxx::work txn(*conn);
 
+        std::string path_arg = req.target().to_string().substr(4);
 
-		pqxx::result result = txn.exec("SELECT * FROM shipments");
+		std::cout << GREEN_TEXT << "[ARGUMENTO RECEBIDO]" << RESET_COLOR << ": id = " << path_arg << std::endl;
 
-        // Convert the result to JSON
+		conn->prepare("get_specific_data", "SELECT * FROM shipments WHERE id = $1");
+
+		pqxx::result result = txn.exec_prepared("get_specific_data", path_arg);
+
         json json_result = json::array();
 			for (const auto& row : result)
 			{
@@ -147,14 +165,57 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 				}
 				json_result.push_back(json_row);
 
-				// Commit the transaction
-				txn.commit();
 
-				// Send the response
 				res.result(http::status::ok);
 				res.set(http::field::content_type, "application/json");
 				res.body() = json_result.dump();
 			}
+			txn.commit();
+			connection_pool.release(conn);
+			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
+        }
+		catch (const std::exception& e)
+		{
+			res.result(http::status::bad_request);
+			res.set(http::field::content_type, "application/json");
+			res.body() = "Database error: " + std::string(e.what());
+		}
+	}
+		else if (req.method() == http::verb::get)
+	{
+		try
+		{
+		auto auth_header = req.base()["Authorization"];
+		/* std::cout << GREEN_TEXT << "[AUTH HEADER]" << RESET_COLOR << ": " << auth_header << std::endl; */
+		if(auth_header == "")
+			throw std::runtime_error("Token nao encontrado");
+		std::string token = auth_header.to_string().substr(7);
+
+		jwt_data token_data = jwt_checker(token);
+
+		std::shared_ptr conn = connection_pool.acquire();
+        pqxx::work txn(*conn);
+
+		std::cout << GREEN_TEXT << "[PATH DO REQUEST]" << RESET_COLOR << ": " << req.target() << std::endl;
+
+		pqxx::result result = txn.exec("SELECT * FROM shipments");
+
+        json json_result = json::array();
+			for (const auto& row : result)
+			{
+				json json_row;
+				for (const auto& field : row)
+				{
+					json_row[field.name()] = field.c_str();
+				}
+				json_result.push_back(json_row);
+
+				res.result(http::status::ok);
+				res.set(http::field::content_type, "application/json");
+				res.body() = json_result.dump();
+			}
+			txn.commit();
+			connection_pool.release(conn);
 			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
         }
 		catch (const std::exception& e)

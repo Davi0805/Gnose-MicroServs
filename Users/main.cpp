@@ -6,9 +6,9 @@
 /* g++ -std=c++17 -o server main.cpp User_utils.cpp Auth_utils.cpp -lboost_system -lpthread -lpqxx -lpq -Ithird_party/jwt-cpp/include -lcrypto
  */
 
+ConnectionPool connection_pool("host=localhost port=5432 dbname=mydatabase user=myuser password=mypassword", 10);
 
 #define PORTA 8001
-ConnectionPool connection_pool("host=localhost port=5432 dbname=mydatabase user=myuser password=mypassword", 10);
 
 void start_accepting(net::io_context& ioc, tcp::acceptor& acceptor) {
     acceptor.async_accept([&](boost::system::error_code ec, tcp::socket socket) {
@@ -24,6 +24,7 @@ int main()
 {
     try
     {
+
         net::io_context ioc;
 
         tcp::acceptor acceptor(ioc, tcp::endpoint(tcp::v4(), PORTA));
