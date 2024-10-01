@@ -138,7 +138,7 @@ void handle_request(http::request<http::string_body> const& req, http::response<
             res.body() = "Database error: " + std::string(e.what());
         }
     }
-	else if (req.method() == http::verb::get && starts_with(req.target(), "/id="))
+	else if (req.method() == http::verb::get && req.target().to_string().starts_with("/id="))
 	{
 		try
 		{
@@ -160,6 +160,8 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 
 		pqxx::result result = txn.exec_prepared("get_specific_data", path_arg);
 
+		if (result.size() == 1)
+		{
         json json_result = json::array();
 			for (const auto& row : result)
 			{
@@ -178,6 +180,13 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 			txn.commit();
 			connection_pool.release(conn);
 			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
+		}
+		else
+		{
+			res.result(http::status::not_found);
+			res.set(http::field::content_type, "application/json");
+			res.body() = "Nao encontrado";
+		}
         }
 		catch (const std::exception& e)
 		{
