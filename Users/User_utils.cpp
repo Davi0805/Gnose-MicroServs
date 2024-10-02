@@ -233,7 +233,7 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			{
 				if (redis_result->type == REDIS_REPLY_STRING)
 				{
-				std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": dado encontrado!" << std::endl;
+				std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": dado recebido!" << std::endl;
 				dado_extraido = true;
 				res.result(http::status::ok);
 				res.set(http::field::content_type, "application/json");
@@ -253,6 +253,8 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			{
 			auto conn = connection_pool.acquire();
 			pqxx::work txn(*conn);
+
+			std::cout << GREEN_TEXT << "[POSTGRES]" << RESET_COLOR << ": dado recebido!" << std::endl;
 
 			conn->prepare("get_user_data", "SELECT * FROM users WHERE id = $1");
 
