@@ -12,6 +12,7 @@
 #include <string>
 #include <semaphore>
 #include <thread>
+#include <hiredis/hiredis.h>
 
 #define GREEN_TEXT "\033[32m"
 #define RESET_COLOR "\033[0m"
@@ -105,6 +106,45 @@ private:
     std::string conn_info_;
     std::size_t pool_size_;
     std::vector<std::shared_ptr<pqxx::connection>> connections_;
+    std::mutex mtx_;
+    std::counting_semaphore<> semaphore_;
+};
+
+class RedisConnectionPool {
+public:
+    RedisConnectionPool(const std::string& host, int port, std::size_t pool_size)
+        : host_(host), port_(port), pool_size_(pool_size), semaphore_(pool_size) {
+        for (std::size_t i = 0; i < pool_size_; ++i) {
+            redisContext* context = redisConnect(host_.c_str(), port_);
+            if (context == nullptr || context->err) {
+                throw std::runtime_error("Failed to connect to Redis");
+            }
+            connections_.push_back(std::shared_ptr<redisContext>(context, redisFree));
+        }
+    }
+
+    std::shared_ptr<redisContext> acquire() {
+        semaphore_.acquire();
+        std::lock_guard<std::mutex> lock(mtx_);
+
+        auto conn = connections_.back();
+        connections_.pop_back();
+        return conn;
+    }
+
+    void release(std::shared_ptr<redisContext> conn) {
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            connections_.push_back(conn);
+        }
+        semaphore_.release();
+    }
+
+private:
+    std::string host_;
+    int port_;
+    std::size_t pool_size_;
+    std::vector<std::shared_ptr<redisContext>> connections_;
     std::mutex mtx_;
     std::counting_semaphore<> semaphore_;
 };

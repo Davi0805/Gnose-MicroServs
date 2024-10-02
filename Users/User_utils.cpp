@@ -20,6 +20,7 @@ company_id VARCHAR(255) NOT NULL);
 
 using json = nlohmann::json;
 extern ConnectionPool connection_pool;
+extern RedisConnectionPool redis_pool;
 
 Postdata parse_post(const std::string req_body)
 {
@@ -79,6 +80,41 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 				std::string permission_level = row["permission"].as<std::string>();
 
 				std::cout << GREEN_TEXT << "[PERMISSION LEVEL]" << RESET_COLOR << ": " << permission_level << std::endl;
+
+				auto cache_context = redis_pool.acquire();
+			    if (!cache_context || cache_context->err)
+				{
+				std::cerr << "Redis context is invalid or not connected." << std::endl;
+				return;
+    			}
+
+				json json_result = json::array();
+				for (const auto &row : result)
+				{
+					json json_row;
+					for (const auto &field : row)
+					{
+						json_row[field.name()] = field.c_str();
+					}
+					json_result.push_back(json_row);
+				}
+
+				std::string cache_values = json_result.dump();
+				std::string cache_key = "user:" + user_id;
+				/* std::string cache_values =	row["username"].as<std::string>() + "," +
+											row["email"].as<std::string>() + "," +
+											row["first_name"].as<std::string>() + "," +
+											row["last_name"].as<std::string>() + "," +
+											company_id + "," +
+											permission_level; */
+
+				redisReply *redis_result = (redisReply *)redisCommand(cache_context.get(), "JSON.SET %s . %s", cache_key.c_str(), cache_values.c_str());
+				std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": " << redis_result->str << std::endl;
+				freeReplyObject(redis_result);
+				redisReply *expire_reply = (redisReply *)redisCommand(cache_context.get(), "EXPIRE %s 3600", cache_key.c_str());
+				std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": " << expire_reply->str << std::endl;
+				freeReplyObject(expire_reply);
+				redis_pool.release(cache_context);
 
 				std::string jwt = generate_jwt(user_id, company_id, permission_level);
 				res.result(http::status::ok);
@@ -182,6 +218,39 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 
 			jwt_data token_data = jwt_checker(token);
 
+			bool dado_extraido = false;
+
+			auto cache_context = redis_pool.acquire();
+			if (!cache_context || cache_context->err)
+			{
+				redis_pool.release(cache_context);
+				throw std::runtime_error("Falha ao conectar com o redis!");
+			}
+
+			std::string cache_key = "user:" + token_data.user_id;
+			redisReply *redis_result = (redisReply *)redisCommand(cache_context.get(), "JSON.GET %s", cache_key.c_str());
+			if (redis_result)
+			{
+				if (redis_result->type == REDIS_REPLY_STRING)
+				{
+				std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": dado encontrado!" << std::endl;
+				dado_extraido = true;
+				res.result(http::status::ok);
+				res.set(http::field::content_type, "application/json");
+				res.body() = redis_result->str;
+				}
+				else
+				{
+					std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": dado nao encontrado!" << std::endl;
+					res.result(http::status::internal_server_error);
+                    res.body() = "Internal Server Error";
+				}
+			}
+			freeReplyObject(redis_result);
+			redis_pool.release(cache_context);
+
+			if (!dado_extraido)
+			{
 			auto conn = connection_pool.acquire();
 			pqxx::work txn(*conn);
 
@@ -211,6 +280,7 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			txn.commit();
 			connection_pool.release(conn);
 			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
+			}
 		}
 		catch (const std::exception &e)
 		{
