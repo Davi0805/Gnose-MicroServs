@@ -42,6 +42,7 @@ struct jwt_data
 {
 	std::string company_id;
 	std::string user_id;
+	std::string permission_level;
 };
 
 
@@ -110,7 +111,7 @@ private:
 
 void handle_request(http::request<http::string_body> const& req, http::response<http::string_body>& res);
 void do_session(tcp::socket socket);
-std::string generate_jwt(const std::string& user_id, const std::string& company_id);
+std::string generate_jwt(const std::string& user_id, const std::string& company_id, const std::string& permission_level);
 jwt_data jwt_checker(const std::string& token);
 Postdata parse_post(const std::string req_body);
 Putdata parse_put(const std::string req_body);

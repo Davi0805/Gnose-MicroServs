@@ -4,7 +4,6 @@
 #include <boost/asio.hpp>
 #include <pqxx/pqxx>
 
-
 #include <nlohmann/json.hpp>
 
 /* CREATE TABLE users (
@@ -19,7 +18,6 @@
 company_id VARCHAR(255) NOT NULL);
  */
 
-
 using json = nlohmann::json;
 extern ConnectionPool connection_pool;
 
@@ -28,10 +26,11 @@ Postdata parse_post(const std::string req_body)
 	Postdata result;
 	json data_body = json::parse(req_body);
 
-    auto get_string = [&](const std::string& key, const std::string& default_value) {
-        return data_body.contains(key) && !data_body[key].is_null() ? data_body[key].get<std::string>() : default_value;
-    };
-    result.username = get_string("username", "");
+	auto get_string = [&](const std::string &key, const std::string &default_value)
+	{
+		return data_body.contains(key) && !data_body[key].is_null() ? data_body[key].get<std::string>() : default_value;
+	};
+	result.username = get_string("username", "");
 	result.password = get_string("password", "");
 	return result;
 }
@@ -41,9 +40,10 @@ Putdata parse_put(const std::string req_body)
 	Putdata result;
 	json data_body = json::parse(req_body);
 
-    auto get_string = [&](const std::string& key, const std::string& default_value) {
-        return data_body.contains(key) && !data_body[key].is_null() ? data_body[key].get<std::string>() : default_value;
-    };
+	auto get_string = [&](const std::string &key, const std::string &default_value)
+	{
+		return data_body.contains(key) && !data_body[key].is_null() ? data_body[key].get<std::string>() : default_value;
+	};
 
 	result.username = get_string("username", "");
 	result.password = get_string("password", "");
@@ -54,90 +54,103 @@ Putdata parse_put(const std::string req_body)
 	return result;
 }
 
-
-void handle_request(http::request<http::string_body> const& req, http::response<http::string_body>& res)
+void handle_request(http::request<http::string_body> const &req, http::response<http::string_body> &res)
 {
-    if (req.method() == http::verb::post)
-    {
-        try
-        {
+	if (req.method() == http::verb::post)
+	{
+		try
+		{
 
 			Postdata data = parse_post(req.body());
 			std::cout << GREEN_TEXT << "[POST]" << RESET_COLOR << ": " << req.body() << std::endl;
 
-            auto conn = connection_pool.acquire();
-            pqxx::work txn(*conn);
+			auto conn = connection_pool.acquire();
+			pqxx::work txn(*conn);
 
-            conn->prepare("verify_user", "SELECT * FROM users WHERE username = $1 AND password = $2");
+			conn->prepare("verify_user", "SELECT * FROM users WHERE username = $1 AND password = $2");
 
-            pqxx::result result = txn.exec_prepared("verify_user", data.username, data.password);
+			pqxx::result result = txn.exec_prepared("verify_user", data.username, data.password);
 
 			if (result.size() == 1)
-            {
+			{
 				pqxx::row row = result[0];
-				std::string user_id= row["id"].as<std::string>();
+				std::string user_id = row["id"].as<std::string>();
 				std::string company_id = row["company_id"].as<std::string>();
+				std::string permission_level = row["permission"].as<std::string>();
 
-				std::string jwt = generate_jwt(user_id, company_id);
-                res.result(http::status::ok);
-                res.set(http::field::content_type, "application/json");
-                res.body() = R"({"message": "Login successful", "jwt": ")" + jwt + R"("})";
-            }
-            else
-            {
-                res.result(http::status::unauthorized);
-                res.set(http::field::content_type, "application/json");
-                res.body() = R"({"message": "Invalid username or password"})";
-            }
+				std::cout << GREEN_TEXT << "[PERMISSION LEVEL]" << RESET_COLOR << ": " << permission_level << std::endl;
 
-            txn.commit();
+				std::string jwt = generate_jwt(user_id, company_id, permission_level);
+				res.result(http::status::ok);
+				res.set(http::field::content_type, "application/json");
+				res.body() = R"({"message": "Login successful", "jwt": ")" + jwt + R"("})";
+			}
+			else
+			{
+				res.result(http::status::unauthorized);
+				res.set(http::field::content_type, "application/json");
+				res.body() = R"({"message": "Invalid username or password"})";
+			}
+
+			txn.commit();
 			connection_pool.release(conn);
-        }
-        catch (const std::exception& e)
-        {
-            res.result(http::status::bad_request);
-            res.set(http::field::content_type, "application/json");
-            res.body() = "Database error: " + std::string(e.what());
-        }
-    }
-	//SE NAO FUNCIONAR, UTILIZAR START_WITH IMPLEMENTADA NO MICROSERVICO CARGAS_INFO
-	// LEMBRAR DE ADICIONAR PERMISSAO EM JWT_DATA E AUTH_UTILS E ADICIONAR COMPARACAO NESSE IF
+		}
+		catch (const std::exception &e)
+		{
+			res.result(http::status::bad_request);
+			res.set(http::field::content_type, "application/json");
+			res.body() = "Database error: " + std::string(e.what());
+		}
+	}
+	// ROTAS PROTEGIDAS A PARTIR DAQUI
 	else if (req.method() == http::verb::get && req.target().to_string().starts_with("/id="))
 	{
 		try
 		{
 
-		std::cout << GREEN_TEXT << "[ARGUMENTO RECEBIDO]" << RESET_COLOR << ": " << req.target() << std::endl;
+			std::cout << GREEN_TEXT << "[ARGUMENTO RECEBIDO]" << RESET_COLOR << ": " << req.target() << std::endl;
 
-		auto auth_header = req.base()["Authorization"];
-		if (auth_header == "")
-			throw std::runtime_error("Token nao encontrado!");
-        std::string token = auth_header.to_string().substr(7); //SUBSTR depois de bearer
+			auto auth_header = req.base()["Authorization"];
+			if (auth_header == "")
+				throw std::runtime_error("Token nao encontrado!");
+			std::string token = auth_header.to_string().substr(7); // SUBSTR depois de bearer
 
-		/* std::cout << GREEN_TEXT << "[JWT TOKEN]" << RESET_COLOR << ": " << token << std::endl; */
+			/* std::cout << GREEN_TEXT << "[JWT TOKEN]" << RESET_COLOR << ": " << token << std::endl; */
 
-		jwt_data token_data = jwt_checker(token);
+			jwt_data token_data = jwt_checker(token);
 
+			std::string path_argument = req.target().to_string().substr(4);
 
-		auto conn = connection_pool.acquire();
-        pqxx::work txn(*conn);
+			if (token_data.permission_level == "0" || token_data.permission_level == "1")
+				throw std::runtime_error("Sem permissao!");
 
-		conn->prepare("get_user_data", "SELECT * FROM users WHERE id = $1");
+			auto conn = connection_pool.acquire();
+			pqxx::work txn(*conn);
 
+			conn->prepare("get_user_data", "SELECT * FROM users WHERE id = $1");
 
-		pqxx::result result = txn.exec_prepared("get_user_data", token_data.user_id);
+			pqxx::result result = txn.exec_prepared("get_user_data", path_argument);
 
+			if (result.size() == 0)
+				throw std::runtime_error("Usuario nao encontrado!");
 
-        json json_result = json::array();
-			for (const auto& row : result)
+			pqxx::row row = result[0];
+			std::string company = row["company_id"].as<std::string>();
+			std::cout << GREEN_TEXT << "[PERMISSION LEVEL]: " << token_data.permission_level << std::endl;
+			std::cout << GREEN_TEXT << "[DEBUG - COMPANY_ID]" << RESET_COLOR << ": extraido da resposta " << company << " e extraido do jwt_data " << token_data.company_id << std::endl;
+			if (token_data.permission_level != "3" && company != token_data.company_id)
+				throw std::runtime_error(
+					"Usuario nao tem permissao para acessar dados de outra empresa!");
+
+			json json_result = json::array();
+			for (const auto &row : result)
 			{
 				json json_row;
-				for (const auto& field : row)
+				for (const auto &field : row)
 				{
 					json_row[field.name()] = field.c_str();
 				}
 				json_result.push_back(json_row);
-
 
 				// Send the response
 				res.result(http::status::ok);
@@ -147,48 +160,49 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 			txn.commit();
 			connection_pool.release(conn);
 			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
-        }
-		catch (const std::exception& e)
+		}
+		catch (const std::exception &e)
 		{
 			res.result(http::status::bad_request);
 			res.set(http::field::content_type, "application/json");
 			res.body() = "Database error: " + std::string(e.what());
 		}
 	}
-		else if (req.method() == http::verb::get)
+	else if (req.method() == http::verb::get)
 	{
 		try
 		{
 
-		auto auth_header = req.base()["Authorization"];
-		if (auth_header == "")
-			throw std::runtime_error("Token nao encontrado!");
-        std::string token = auth_header.to_string().substr(7); //SUBSTR depois de bearer
+			auto auth_header = req.base()["Authorization"];
+			if (auth_header == "")
+				throw std::runtime_error("Token nao encontrado!");
+			std::string token = auth_header.to_string().substr(7); // SUBSTR depois de bearer
 
-		/* std::cout << GREEN_TEXT << "[JWT TOKEN]" << RESET_COLOR << ": " << token << std::endl; */
+			/* std::cout << GREEN_TEXT << "[JWT TOKEN]" << RESET_COLOR << ": " << token << std::endl; */
 
-		jwt_data token_data = jwt_checker(token);
+			jwt_data token_data = jwt_checker(token);
 
+			auto conn = connection_pool.acquire();
+			pqxx::work txn(*conn);
 
-		auto conn = connection_pool.acquire();
-        pqxx::work txn(*conn);
+			conn->prepare("get_user_data", "SELECT * FROM users WHERE id = $1");
 
-		conn->prepare("get_user_data", "SELECT * FROM users WHERE id = $1");
+			pqxx::result result = txn.exec_prepared("get_user_data", token_data.user_id);
 
+			//DEFINITIVAMENTE REDUNDANTE POREM PODE PREVINIR UM CRASH
+			//EM CASO DE OVERLOAD NO BANCO DE DADOS OU AUSENCIA DE RESPOSTA
+			if (result.size() == 0)
+				throw std::runtime_error("Falha ao buscar no banco de dados");
 
-		pqxx::result result = txn.exec_prepared("get_user_data", token_data.user_id);
-
-
-        json json_result = json::array();
-			for (const auto& row : result)
+			json json_result = json::array();
+			for (const auto &row : result)
 			{
 				json json_row;
-				for (const auto& field : row)
+				for (const auto &field : row)
 				{
 					json_row[field.name()] = field.c_str();
 				}
 				json_result.push_back(json_row);
-
 
 				res.result(http::status::ok);
 				res.set(http::field::content_type, "application/json");
@@ -197,8 +211,8 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 			txn.commit();
 			connection_pool.release(conn);
 			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
-        }
-		catch (const std::exception& e)
+		}
+		catch (const std::exception &e)
 		{
 			res.result(http::status::bad_request);
 			res.set(http::field::content_type, "application/json");
@@ -218,7 +232,7 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 			jwt_data token_data = jwt_checker(token);
 
 			auto conn = connection_pool.acquire();
-	        pqxx::work txn(*conn);
+			pqxx::work txn(*conn);
 
 			conn->prepare("put_user_data", "UPDATE users SET username = $1, email = $2, password = $3, first_name = $4, last_name = $5 WHERE id = $6");
 
@@ -233,39 +247,37 @@ void handle_request(http::request<http::string_body> const& req, http::response<
 			res.set(http::field::content_type, "application/json");
 			res.body() = "Dados atualizados!";
 		}
-		catch(const std::exception& e)
+		catch (const std::exception &e)
 		{
 			res.result(http::status::bad_request);
 			res.set(http::field::content_type, "application/json");
 			res.body() = "Database error: " + std::string(e.what());
 		}
-
 	}
-    else
-    {
-        res.result(http::status::bad_request);
-        res.set(http::field::content_type, "application/json");
-        res.body() = "Invalid request method";
-    }
+	else
+	{
+		res.result(http::status::bad_request);
+		res.set(http::field::content_type, "application/json");
+		res.body() = "Invalid request method";
+	}
 
-    res.prepare_payload();
+	res.prepare_payload();
 }
 
 void do_session(tcp::socket socket)
 {
-    try
-    {
-        beast::flat_buffer buffer;
-        http::request<http::string_body> req;
-        http::response<http::string_body> res;
+	try
+	{
+		beast::flat_buffer buffer;
+		http::request<http::string_body> req;
+		http::response<http::string_body> res;
 
-        http::read(socket, buffer, req);
-        handle_request(req, res);
-        http::write(socket, res);
-    }
-    catch(const std::exception& e)
-    {
-        std::cerr << e.what() << '\n';
-    }
-
+		http::read(socket, buffer, req);
+		handle_request(req, res);
+		http::write(socket, res);
+	}
+	catch (const std::exception &e)
+	{
+		std::cerr << e.what() << '\n';
+	}
 }
