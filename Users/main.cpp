@@ -50,14 +50,15 @@ const char* db_password = std::getenv("DB_PASSWORD");
                                     " password=" + std::string(db_password);
 
 
+#define PORTA 8001
+#define REDIS_PORTA 6379
 
 // LEMBRAR DE MODIFICAR CREDENCIAIS PARA DB DO MICROSERVICO
 /* ConnectionPool connection_pool("host=db port=5432 dbname=mydatabase user=myuser password=mypassword", 10); */
 ConnectionPool connection_pool(connection_string, 10);
-RedisConnectionPool redis_pool("redis", 6379, 10);
+RedisConnectionPool redis_pool("redis", REDIS_PORTA, 10);
 
 
-#define PORTA 8001
 
 // FAZENDO LISTENING POR RECURSAO
 void start_accepting(net::io_context &ioc, tcp::acceptor &acceptor)
@@ -79,6 +80,7 @@ int main()
 
 		tcp::acceptor acceptor(ioc, tcp::endpoint(tcp::v4(), PORTA));
 		std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": Iniciando servidor na porta " << PORTA << " | Initializing server on port " << PORTA << "!" << std::endl;
+		std::cout << GREEN_TEXT << "[CONNECTIONS_POOL]" << RESET_COLOR << ": PORTA DO REDIS = " << REDIS_PORTA  << " | PORTA DO POSTGRES = " << db_port << " !" << std::endl;
 /* 		redisContext *cache_context = redisConnect("127.0.0.1", 6379);
 		if (cache_context == nullptr || cache_context->err)
 		{

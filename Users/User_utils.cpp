@@ -109,10 +109,12 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 											permission_level; */
 
 				redisReply *redis_result = (redisReply *)redisCommand(cache_context.get(), "JSON.SET %s . %s", cache_key.c_str(), cache_values.c_str());
-				std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": " << redis_result->str << std::endl;
+				// Investigar porque isso quebra o COUT
+				/* std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": " << redis_result->str << std::endl; */
 				freeReplyObject(redis_result);
 				redisReply *expire_reply = (redisReply *)redisCommand(cache_context.get(), "EXPIRE %s 3600", cache_key.c_str());
-				std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": " << expire_reply->str << std::endl;
+				//ESSE AQUI TBM
+				/* std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": " << expire_reply->str << std::endl; */
 				freeReplyObject(expire_reply);
 				redis_pool.release(cache_context);
 
@@ -188,7 +190,6 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 				}
 				json_result.push_back(json_row);
 
-				// Send the response
 				res.result(http::status::ok);
 				res.set(http::field::content_type, "application/json");
 				res.body() = json_result.dump();
