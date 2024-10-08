@@ -1,7 +1,7 @@
 NAME = Server
 G++ = g++
 VERSAO = -std=c++20
-FLAGS = -lboost_system -lpthread -lpqxx -lpq -IIncludes/third_party/jwt-cpp/include -lcrypto
+FLAGS = -lboost_system -lpthread -lpqxx -lpq -IIncludes/third_party/jwt-cpp/include -lcrypto -lhiredis
 
 SRCS = main.cpp CargasInfo_utils.cpp Auth_utils.cpp
 

@@ -12,6 +12,7 @@
 #include <string>
 #include <semaphore>
 #include <thread>
+#include <hiredis/hiredis.h>
 
 #define GREEN_TEXT "\033[32m"
 #define RESET_COLOR "\033[0m"
@@ -102,7 +103,7 @@ private:
 
 
 // REATIVAR AO UTILIZAR REDIS NOVAMENTE
-/* class RedisConnectionPool {
+class RedisConnectionPool {
 public:
     RedisConnectionPool(const std::string& host, int port, std::size_t pool_size, int max_retries = 3, int retry_delay_ms = 1000)
         : host_(host), port_(port), pool_size_(pool_size), semaphore_(pool_size) {
@@ -150,7 +151,7 @@ private:
     std::vector<std::shared_ptr<redisContext>> connections_;
     std::mutex mtx_;
     std::counting_semaphore<> semaphore_;
-}; */
+};
 
 struct jwt_data
 {

@@ -101,6 +101,7 @@
 
 using json = nlohmann::json;
 extern ConnectionPool connection_pool;
+extern RedisConnectionPool redis_pool;
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -164,6 +165,30 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			std::string token = auth_header.to_string().substr(7);
 			jwt_data token_data = jwt_checker(token);
 
+			// CHECAR SESSION NO REDIS
+			auto cache_context = redis_pool.acquire();
+			if (!cache_context || cache_context->err)
+			{
+				redis_pool.release(cache_context);
+				throw std::runtime_error("Falha ao conectar com o redis!");
+			}
+
+			std::string cache_key = "user:" + token_data.user_id;
+			redisReply *redis_result = (redisReply *)redisCommand(cache_context.get(), "JSON.GET %s $.session_jwt", cache_key.c_str());
+			if (redis_result)
+			{
+				std::cout << GREEN_TEXT << "[AUTH-REDIS]" << RESET_COLOR << ": consultando session!" << std::endl;
+				if (redis_result->str != token)
+					throw std::runtime_error("Token nao compativel!");
+				std::cout << GREEN_TEXT << "[AUTH-REDIS]" << RESET_COLOR << ": Session encontrada!" << std::endl;
+			}
+			else
+			{
+				std::cout << GREEN_TEXT << "[AUTH-REDIS]" << RESET_COLOR << ": session nao encontrada!" << std::endl;
+				throw std::runtime_error("Session nao encontrada!");
+			}
+			redis_pool.release(cache_context);
+
 			Postdata data = parse_post(req.body());
 			std::cout << GREEN_TEXT << "[POST]" << RESET_COLOR << ": " << req.body() << std::endl;
 
@@ -185,7 +210,7 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 		{
 			res.result(http::status::bad_request);
 			res.set(http::field::content_type, "application/json");
-			res.body() = "Database error: " + std::string(e.what());
+			res.body() = "error: " + std::string(e.what());
 		}
 	}
 	else if (req.method() == http::verb::get && req.target().to_string().starts_with("/id="))
@@ -255,6 +280,32 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			std::string token = auth_header.to_string().substr(7);
 
 			jwt_data token_data = jwt_checker(token);
+
+			// CHECAR SESSION NO REDIS
+			auto cache_context = redis_pool.acquire();
+			if (!cache_context || cache_context->err)
+			{
+				redis_pool.release(cache_context);
+				throw std::runtime_error("Falha ao conectar com o redis!");
+			}
+
+			std::string cache_key = "user:" + token_data.user_id;
+			redisReply *redis_result = (redisReply *)redisCommand(cache_context.get(), "JSON.GET %s $[0].session_jwt", cache_key.c_str());
+			if (redis_result)
+			{
+				std::cout << GREEN_TEXT << "[AUTH-REDIS]" << RESET_COLOR << ": consultando session!" << std::endl;
+				std::string redisreply_converted(redis_result->str, redis_result->len);
+				std::cout << GREEN_TEXT << "[AUTH-REDIS]" << RESET_COLOR << ": token em caching = " << redisreply_converted << " | token no jwt = " << token << std::endl;
+				if (redisreply_converted.substr(2, 189) != token)
+					throw std::runtime_error("Token nao compativel!");
+				std::cout << GREEN_TEXT << "[AUTH-REDIS]" << RESET_COLOR << ": Session encontrada!" << std::endl;
+			}
+			else
+			{
+				std::cout << GREEN_TEXT << "[AUTH-REDIS]" << RESET_COLOR << ": session nao encontrada!" << std::endl;
+				throw std::runtime_error("Session nao encontrada!");
+			}
+			redis_pool.release(cache_context);
 
 			std::shared_ptr conn = connection_pool.acquire();
 			pqxx::work txn(*conn);

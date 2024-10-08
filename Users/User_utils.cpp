@@ -111,6 +111,9 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 
 				std::cout << GREEN_TEXT << "[PERMISSION LEVEL]" << RESET_COLOR << ": " << permission_level << std::endl;
 
+				// GERANDO JWToken
+				std::string jwt = generate_jwt(user_id, company_id, permission_level);
+
 				auto cache_context = redis_pool.acquire();
 				if (!cache_context || cache_context->err)
 				{
@@ -126,6 +129,7 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 					{
 						json_row[field.name()] = field.c_str();
 					}
+					json_row["session_jwt"] = jwt;
 					json_result.push_back(json_row);
 				}
 
@@ -142,7 +146,6 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 				freeReplyObject(expire_reply);
 				redis_pool.release(cache_context);
 
-				std::string jwt = generate_jwt(user_id, company_id, permission_level);
 				res.result(http::status::ok);
 				res.set(http::field::content_type, "application/json");
 				res.body() = R"({"message": "Login successful", "jwt": ")" + jwt + R"("})";

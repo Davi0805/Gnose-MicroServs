@@ -19,10 +19,12 @@ const char* db_password = std::getenv("DB_PASSWORD");
                                     " password=" + std::string(db_password);
 
 #define PORTA 8000
+#define REDIS_PORTA 6379
 
 // LEMBRAR DE MODIFICAR CREDENCIAIS PARA DB DO MICROSERVICO
 /* ConnectionPool connection_pool("host=localhost port=5432 dbname=mydatabase user=myuser password=mypassword", 10); */
 ConnectionPool connection_pool(connection_string, 10);
+RedisConnectionPool redis_pool("redis", REDIS_PORTA, 10);
 
 // FAZENDO LISTENING POR RECURSAO
 void start_accepting(net::io_context& ioc, tcp::acceptor& acceptor) {
