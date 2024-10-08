@@ -23,8 +23,8 @@ services:
   user-backend:
     build: ./Users
     depends_on:
-      - db
       - redis
+      - db
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -33,6 +33,20 @@ services:
       DB_PASSWORD: mypassword
     ports:
       - "8001:8001"
+
+  cargas-backend:
+    build: ./Cargas_info
+    depends_on:
+      - redis
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: mydatabase
+      DB_USER: myuser
+      DB_PASSWORD: mypassword
+    ports:
+      - "8000:8000"
 
 volumes:
   db-data:

@@ -7,43 +7,97 @@
 #include <nlohmann/json.hpp>
 
 /* CREATE TABLE shipments (
-  id SERIAL PRIMARY KEY,
-  company_id VARCHAR(255) NOT NULL,
-  costumer VARCHAR(255) NOT NULL,
-  shipping_status VARCHAR(255) NOT NULL,
-  type_of_load VARCHAR(255) NOT NULL,
-  origin VARCHAR(255) NOT NULL,
-  destination VARCHAR(255) NOT NULL,
-  weight DECIMAL(10, 2) NOT NULL,
-  cost DECIMAL(10, 2) NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  ce_mercante VARCHAR(255),
-  ce_m_filename VARCHAR(255),
-  ce_m_filepath VARCHAR(255),
-  packinglist_filename VARCHAR(255),
-  packinglist_filepath VARCHAR(255),
-  ncm VARCHAR(255),
-  cntrnum VARCHAR(255),
-  referenciaid VARCHAR(255),
-  afrmmpago VARCHAR(255),
-  afrmmfilename VARCHAR(255),
-  afrmmfilepath VARCHAR(255),
-  blnum VARCHAR(255),
-  bl_filename VARCHAR(255),
-  bl_filepath VARCHAR(255),
-  nfnum VARCHAR(255)
+    costumer VARCHAR(255),
+    company_id VARCHAR(255),
+    shipping_status VARCHAR(255),
+    type_of_load VARCHAR(255),
+    origin VARCHAR(255),
+    destination VARCHAR(255),
+    weight VARCHAR(255),
+    cost VARCHAR(255),
+    ce_mercante VARCHAR(255),
+    ce_mercante_filename VARCHAR(255),
+    ce_mercante_filepath VARCHAR(255),
+    packinglist_filename VARCHAR(255),
+    packinglist_filepath VARCHAR(255),
+    ncm VARCHAR(255),
+    cntr_id VARCHAR(255),
+    referencia_id VARCHAR(255),
+    afrmmpago VARCHAR(255),
+    afrmm_filename VARCHAR(255),
+    afrmm_filepath VARCHAR(255),
+    blnum VARCHAR(255),
+    bl_filename VARCHAR(255),
+    bl_filepath VARCHAR(255),
+    num_nf VARCHAR(255)
 ); */
 
-/* {
-	"costumer": "Jao te",
-	"company_id": "2",
-	"shipping_status": "Transito",
-	"type_of_load": "copos",
-	"origin": "Pequim",
-	"destination": "Rio de Janeiro",
-	"weight": "2230.00",
-	"cost": "223.00"
-} */
+/* INSERT INTO shipments (
+    costumer, company_id, shipping_status, type_of_load, origin, destination, weight, cost,
+    ce_mercante, ce_mercante_filename, ce_mercante_filepath, packinglist_filename, packinglist_filepath,
+    ncm, cntr_id, referencia_id, afrmmpago, afrmm_filename, afrmm_filepath, blnum, bl_filename,
+    bl_filepath, num_nf
+) VALUES
+(
+    'John Doe', '12345', 'In Transit', 'Full Load', 'New York', 'Los Angeles', '1000kg', '5000',
+    '123456789', 'ce_mercante.pdf', '/path/to/ce_mercante.pdf', 'packinglist.pdf', '/path/to/packinglist.pdf',
+    '1234.56.78', 'CNTR12345', 'REF12345', 'Paid', 'afrmm.pdf', '/path/to/afrmm.pdf', 'BL12345', 'bl.pdf',
+    '/path/to/bl.pdf', 'NF12345'
+),
+(
+    'Jane Smith', '67890', 'Delivered', 'Partial Load', 'Chicago', 'Houston', '500kg', '2500',
+    '987654321', 'ce_mercante2.pdf', '/path/to/ce_mercante2.pdf', 'packinglist2.pdf', '/path/to/packinglist2.pdf',
+    '8765.43.21', 'CNTR67890', 'REF67890', 'Unpaid', 'afrmm2.pdf', '/path/to/afrmm2.pdf', 'BL67890', 'bl2.pdf',
+    '/path/to/bl2.pdf', 'NF67890'
+),
+(
+    'Alice Johnson', '54321', 'Pending', 'Full Load', 'Miami', 'Seattle', '1500kg', '7500',
+    '112233445', 'ce_mercante3.pdf', '/path/to/ce_mercante3.pdf', 'packinglist3.pdf', '/path/to/packinglist3.pdf',
+    '5678.12.34', 'CNTR54321', 'REF54321', 'Paid', 'afrmm3.pdf', '/path/to/afrmm3.pdf', 'BL54321', 'bl3.pdf',
+    '/path/to/bl3.pdf', 'NF54321'
+),
+(
+    'Bob Brown', '98765', 'In Transit', 'Partial Load', 'San Francisco', 'Denver', '800kg', '4000',
+    '998877665', 'ce_mercante4.pdf', '/path/to/ce_mercante4.pdf', 'packinglist4.pdf', '/path/to/packinglist4.pdf',
+    '4321.65.87', 'CNTR98765', 'REF98765', 'Unpaid', 'afrmm4.pdf', '/path/to/afrmm4.pdf', 'BL98765', 'bl4.pdf',
+    '/path/to/bl4.pdf', 'NF98765'
+),
+(
+    'Charlie Davis', '11223', 'Delivered', 'Full Load', 'Boston', 'Phoenix', '2000kg', '10000',
+    '556677889', 'ce_mercante5.pdf', '/path/to/ce_mercante5.pdf', 'packinglist5.pdf', '/path/to/packinglist5.pdf',
+    '8765.43.21', 'CNTR11223', 'REF11223', 'Paid', 'afrmm5.pdf', '/path/to/afrmm5.pdf', 'BL11223', 'bl5.pdf',
+    '/path/to/bl5.pdf', 'NF11223'
+),
+(
+    'Diana Evans', '33445', 'Pending', 'Partial Load', 'Atlanta', 'Dallas', '1200kg', '6000',
+    '223344556', 'ce_mercante6.pdf', '/path/to/ce_mercante6.pdf', 'packinglist6.pdf', '/path/to/packinglist6.pdf',
+    '3456.78.90', 'CNTR33445', 'REF33445', 'Unpaid', 'afrmm6.pdf', '/path/to/afrmm6.pdf', 'BL33445', 'bl6.pdf',
+    '/path/to/bl6.pdf', 'NF33445'
+),
+(
+    'Eve Foster', '55667', 'In Transit', 'Full Load', 'Philadelphia', 'San Diego', '1800kg', '9000',
+    '667788990', 'ce_mercante7.pdf', '/path/to/ce_mercante7.pdf', 'packinglist7.pdf', '/path/to/packinglist7.pdf',
+    '6789.01.23', 'CNTR55667', 'REF55667', 'Paid', 'afrmm7.pdf', '/path/to/afrmm7.pdf', 'BL55667', 'bl7.pdf',
+    '/path/to/bl7.pdf', 'NF55667'
+),
+(
+    'Frank Green', '77889', 'Delivered', 'Partial Load', 'Detroit', 'Las Vegas', '700kg', '3500',
+    '334455667', 'ce_mercante8.pdf', '/path/to/ce_mercante8.pdf', 'packinglist8.pdf', '/path/to/packinglist8.pdf',
+    '7890.12.34', 'CNTR77889', 'REF77889', 'Unpaid', 'afrmm8.pdf', '/path/to/afrmm8.pdf', 'BL77889', 'bl8.pdf',
+    '/path/to/bl8.pdf', 'NF77889'
+),
+(
+    'Grace Harris', '99001', 'Pending', 'Full Load', 'Orlando', 'Portland', '1600kg', '8000',
+    '445566778', 'ce_mercante9.pdf', '/path/to/ce_mercante9.pdf', 'packinglist9.pdf', '/path/to/packinglist9.pdf',
+    '8901.23.45', 'CNTR99001', 'REF99001', 'Paid', 'afrmm9.pdf', '/path/to/afrmm9.pdf', 'BL99001', 'bl9.pdf',
+    '/path/to/bl9.pdf', 'NF99001'
+),
+(
+    'Hank Irving', '22334', 'In Transit', 'Partial Load', 'Charlotte', 'San Antonio', '900kg', '4500',
+    '556677889', 'ce_mercante10.pdf', '/path/to/ce_mercante10.pdf', 'packinglist10.pdf', '/path/to/packinglist10.pdf',
+    '9012.34.56', 'CNTR22334', 'REF22334', 'Unpaid', 'afrmm10.pdf', '/path/to/afrmm10.pdf', 'BL22334', 'bl10.pdf',
+    '/path/to/bl10.pdf', 'NF22334'
+); */
 
 using json = nlohmann::json;
 extern ConnectionPool connection_pool;

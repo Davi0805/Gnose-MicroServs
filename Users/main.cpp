@@ -9,7 +9,7 @@
 /*
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    username VARCHAR(255) NOT NULL,
+    username VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     first_name VARCHAR(255),
@@ -54,7 +54,6 @@ const char* db_password = std::getenv("DB_PASSWORD");
 #define REDIS_PORTA 6379
 
 // LEMBRAR DE MODIFICAR CREDENCIAIS PARA DB DO MICROSERVICO
-/* ConnectionPool connection_pool("host=db port=5432 dbname=mydatabase user=myuser password=mypassword", 10); */
 ConnectionPool connection_pool(connection_string, 10);
 RedisConnectionPool redis_pool("redis", REDIS_PORTA, 10);
 
@@ -79,18 +78,8 @@ int main()
 		net::io_context ioc;
 
 		tcp::acceptor acceptor(ioc, tcp::endpoint(tcp::v4(), PORTA));
-		std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": Iniciando servidor na porta " << PORTA << " | Initializing server on port " << PORTA << "!" << std::endl;
-		std::cout << GREEN_TEXT << "[CONNECTIONS_POOL]" << RESET_COLOR << ": PORTA DO REDIS = " << REDIS_PORTA  << " | PORTA DO POSTGRES = " << db_port << " !" << std::endl;
-/* 		redisContext *cache_context = redisConnect("127.0.0.1", 6379);
-		if (cache_context == nullptr || cache_context->err)
-		{
-			std::cout << "Error: " << cache_context->errstr << std::endl;
-			return 1;
-		}
-
-		redisReply *reply = (redisReply *)redisCommand(cache_context, "PING");
-		std::cout << "PING: " << reply->str << std::endl;
-		freeReplyObject(reply); */
+		std::cout << GREEN_TEXT << "[USERS]" << RESET_COLOR << ": Iniciando servidor na porta " << PORTA << " | Initializing server on port " << PORTA << "!" << std::endl;
+		/* std::cout << GREEN_TEXT << "[CONNECTIONS_POOL]" << RESET_COLOR << ": PORTA DO REDIS = " << REDIS_PORTA  << " | PORTA DO POSTGRES = " << db_port << " !" << std::endl; */
 
 		start_accepting(ioc, acceptor);
 

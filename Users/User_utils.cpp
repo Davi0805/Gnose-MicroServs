@@ -36,6 +36,7 @@ Postdata parse_post(const std::string req_body)
 	return result;
 }
 
+// CONSERTAR PUT REQUEST PARA RECEBER COMPANY_ID E ADICIONAR DPS ENDPOINT PARA ALTERAR PERMISSAO
 Putdata parse_put(const std::string req_body)
 {
 	Putdata result;
@@ -55,9 +56,38 @@ Putdata parse_put(const std::string req_body)
 	return result;
 }
 
+Registro_func_data parse_registro_func(const std::string req_body, const jwt_data token_data)
+{
+	Registro_func_data result;
+	json data_body = json::parse(req_body);
+
+	// OBJECT PARSER DA LIB NLOHMANN JSON
+	auto get_string = [&](const std::string &key, const std::string &default_value)
+	{
+		return data_body.contains(key) && !data_body[key].is_null() ? data_body[key].get<std::string>() : default_value;
+	};
+
+	result.username = get_string("username", "");
+	result.password = get_string("password", "");
+	result.email = get_string("email", "");
+	result.first_name = get_string("first_name", "");
+	result.last_name = get_string("last_name", "");
+	result.permission = get_string("permission", "");
+
+	// DEUS PROTEJA QUEM FOR REVISAR ESSE CODIGO
+	if (result.username == "" || result.password == "" || result.email == "" ||
+		result.first_name == "" || result.last_name == "" || result.permission == "" || result.permission == "3")
+		throw std::runtime_error("Faltou algum argumento ou argumento mal formatado!");
+
+	if (token_data.permission_level != "2" && token_data.permission_level != "3")
+		throw std::runtime_error("Nao autorizado!");
+
+	return result;
+}
+
 void handle_request(http::request<http::string_body> const &req, http::response<http::string_body> &res)
 {
-	if (req.method() == http::verb::post)
+	if (req.method() == http::verb::post && req.target().to_string() == "/") // LOGIN ENDPOINT
 	{
 		try
 		{
@@ -82,11 +112,11 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 				std::cout << GREEN_TEXT << "[PERMISSION LEVEL]" << RESET_COLOR << ": " << permission_level << std::endl;
 
 				auto cache_context = redis_pool.acquire();
-			    if (!cache_context || cache_context->err)
+				if (!cache_context || cache_context->err)
 				{
-				std::cerr << "Redis context is invalid or not connected." << std::endl;
-				return;
-    			}
+					std::cerr << "Redis context is invalid or not connected." << std::endl;
+					return;
+				}
 
 				json json_result = json::array();
 				for (const auto &row : result)
@@ -101,19 +131,13 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 
 				std::string cache_values = json_result.dump();
 				std::string cache_key = "user:" + user_id;
-				/* std::string cache_values =	row["username"].as<std::string>() + "," +
-											row["email"].as<std::string>() + "," +
-											row["first_name"].as<std::string>() + "," +
-											row["last_name"].as<std::string>() + "," +
-											company_id + "," +
-											permission_level; */
 
 				redisReply *redis_result = (redisReply *)redisCommand(cache_context.get(), "JSON.SET %s . %s", cache_key.c_str(), cache_values.c_str());
 				// Investigar porque isso quebra o COUT
 				/* std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": " << redis_result->str << std::endl; */
 				freeReplyObject(redis_result);
 				redisReply *expire_reply = (redisReply *)redisCommand(cache_context.get(), "EXPIRE %s 3600", cache_key.c_str());
-				//ESSE AQUI TBM
+				// ESSE AQUI TBM
 				/* std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": " << expire_reply->str << std::endl; */
 				freeReplyObject(expire_reply);
 				redis_pool.release(cache_context);
@@ -141,7 +165,7 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 		}
 	}
 	// ROTAS PROTEGIDAS A PARTIR DAQUI
-	else if (req.method() == http::verb::get && req.target().to_string().starts_with("/id="))
+	else if (req.method() == http::verb::get && req.target().to_string().starts_with("/id=")) // PESQUISA DE USUARIO
 	{
 		try
 		{
@@ -205,7 +229,45 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			res.body() = "Database error: " + std::string(e.what());
 		}
 	}
-	else if (req.method() == http::verb::get)
+	else if (req.method() == http::verb::post && req.target().to_string().starts_with("/funcionario/")) // REGISTRO DE FUNCIONARIO
+	{
+		try
+		{
+			auto auth_header = req.base()["Authorization"];
+			if (auth_header == "")
+				throw std::runtime_error("Token nao encontrado!");
+
+			std::string token = auth_header.to_string().substr(7);
+
+			jwt_data token_data = jwt_checker(token);
+
+			Registro_func_data data = parse_registro_func(req.body(), token_data);
+
+			auto conn = connection_pool.acquire();
+			pqxx::work txn(*conn);
+			conn->prepare("registrando_funcionario", "INSERT INTO users (username, password, email, first_name, last_name, permission, company_id) VALUES ($1, $2, $3, $4, $5, $6, $7)");
+
+			pqxx::result result = txn.exec_prepared("registrando_funcionario", data.username, data.password, data.email, data.first_name, data.last_name, data.permission, token_data.company_id);
+
+			if (result.affected_rows() != 1)
+				throw std::runtime_error("Erro ao adicionar usuario!");
+
+			txn.commit();
+			connection_pool.release(conn);
+
+			res.result(http::status::ok);
+			res.set(http::field::content_type, "application/json");
+			res.body() = "Sucesso!";
+		}
+		catch (const std::exception &e)
+		{
+			res.result(http::status::bad_request);
+			res.set(http::field::content_type, "application/json");
+			res.body() = "Erro: " + std::string(e.what());
+			std::cerr << e.what() << '\n';
+		}
+	}
+	else if (req.method() == http::verb::get) // MEU USUARIO
 	{
 		try
 		{
@@ -234,17 +296,18 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			{
 				if (redis_result->type == REDIS_REPLY_STRING)
 				{
-				std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": dado recebido!" << std::endl;
-				dado_extraido = true;
-				res.result(http::status::ok);
-				res.set(http::field::content_type, "application/json");
-				res.body() = redis_result->str;
+					std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": dado recebido!" << std::endl;
+					dado_extraido = true;
+					res.result(http::status::ok);
+					res.set(http::field::content_type, "application/json");
+					res.body() = redis_result->str;
 				}
 				else
 				{
 					std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": dado nao encontrado!" << std::endl;
 					res.result(http::status::internal_server_error);
-                    res.body() = "Internal Server Error";
+					res.set(http::field::content_type, "application/json");
+					res.body() = "Internal Server Error";
 				}
 			}
 			freeReplyObject(redis_result);
@@ -252,37 +315,37 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 
 			if (!dado_extraido)
 			{
-			auto conn = connection_pool.acquire();
-			pqxx::work txn(*conn);
+				auto conn = connection_pool.acquire();
+				pqxx::work txn(*conn);
 
-			std::cout << GREEN_TEXT << "[POSTGRES]" << RESET_COLOR << ": dado recebido!" << std::endl;
+				std::cout << GREEN_TEXT << "[POSTGRES]" << RESET_COLOR << ": dado recebido!" << std::endl;
 
-			conn->prepare("get_user_data", "SELECT * FROM users WHERE id = $1");
+				conn->prepare("get_user_data", "SELECT * FROM users WHERE id = $1");
 
-			pqxx::result result = txn.exec_prepared("get_user_data", token_data.user_id);
+				pqxx::result result = txn.exec_prepared("get_user_data", token_data.user_id);
 
-			//DEFINITIVAMENTE REDUNDANTE POREM PODE PREVINIR UM CRASH
-			//EM CASO DE OVERLOAD NO BANCO DE DADOS OU AUSENCIA DE RESPOSTA
-			if (result.size() == 0)
-				throw std::runtime_error("Falha ao buscar no banco de dados");
+				// DEFINITIVAMENTE REDUNDANTE POREM PODE PREVINIR UM CRASH
+				// EM CASO DE OVERLOAD NO BANCO DE DADOS OU AUSENCIA DE RESPOSTA
+				if (result.size() == 0)
+					throw std::runtime_error("Falha ao buscar no banco de dados");
 
-			json json_result = json::array();
-			for (const auto &row : result)
-			{
-				json json_row;
-				for (const auto &field : row)
+				json json_result = json::array();
+				for (const auto &row : result)
 				{
-					json_row[field.name()] = field.c_str();
-				}
-				json_result.push_back(json_row);
+					json json_row;
+					for (const auto &field : row)
+					{
+						json_row[field.name()] = field.c_str();
+					}
+					json_result.push_back(json_row);
 
-				res.result(http::status::ok);
-				res.set(http::field::content_type, "application/json");
-				res.body() = json_result.dump();
-			}
-			txn.commit();
-			connection_pool.release(conn);
-			std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
+					res.result(http::status::ok);
+					res.set(http::field::content_type, "application/json");
+					res.body() = json_result.dump();
+				}
+				txn.commit();
+				connection_pool.release(conn);
+				std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
 			}
 		}
 		catch (const std::exception &e)
@@ -292,7 +355,7 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			res.body() = "Database error: " + std::string(e.what());
 		}
 	}
-	else if (req.method() == http::verb::put)
+	else if (req.method() == http::verb::put) // ALTERAR MEUS DADOS
 	{
 		try
 		{
