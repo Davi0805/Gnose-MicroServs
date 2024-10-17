@@ -240,10 +240,17 @@ class Error_handler
 		http::response<http::string_body> gerar_resposta()
 		{
 			if (erro == "Token nao encontrado!")
-				error_res.result(http::status::unauthorized);
+			{	error_res.result(http::status::unauthorized);
 				error_res.set(http::field::content_type, "application/json");
 				error_res.body() = "Unauthorized";
-
+			}
+			else if (erro == "Falha ao conectar com o redis!")
+			{
+				error_res.result(http::status::internal_server_error);
+				error_res.set(http::field::content_type, "application/json");
+				error_res.body() = erro;
+			}
+			
 			return(error_res);
 		}
 	private:
