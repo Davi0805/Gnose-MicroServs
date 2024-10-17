@@ -351,11 +351,14 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 				std::cout << GREEN_TEXT << "[GET]" << RESET_COLOR << ": " << res.body() << std::endl;
 			}
 		}
+		// TESTANDO ERROR HANDLER OBJ
 		catch (const std::exception &e)
 		{
-			res.result(http::status::bad_request);
+			/* res.result(http::status::bad_request);
 			res.set(http::field::content_type, "application/json");
-			res.body() = "Database error: " + std::string(e.what());
+			res.body() = "Database error: " + std::string(e.what()); */
+			Error_handler Error_handler(std::string(e.what()), res);
+			res = Error_handler.gerar_resposta();
 		}
 	}
 	else if (req.method() == http::verb::put) // ALTERAR MEUS DADOS

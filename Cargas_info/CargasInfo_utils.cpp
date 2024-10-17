@@ -145,13 +145,6 @@ Postdata parse_post(const std::string req_body)
 	return result;
 }
 
-// PROVAVELMENTE POSSO SUBSTITUIR ESSA FUNCAO POR REQ.TARGET().TO_STRING().START_WITH("/id=")
-bool starts_with(boost::beast::string_view original, std::string prefix)
-{
-	std::string buffer(original.data(), original.size());
-	return buffer.rfind(prefix, 0) == 0;
-}
-
 void handle_request(http::request<http::string_body> const &req, http::response<http::string_body> &res)
 {
 	if (req.method() == http::verb::post)

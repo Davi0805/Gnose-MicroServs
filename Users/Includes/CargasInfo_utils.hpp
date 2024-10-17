@@ -229,6 +229,28 @@ private:
     std::counting_semaphore<> semaphore_;
 };
 
+class Error_handler
+{
+	public:
+		Error_handler(std::string cerr, http::response<http::string_body> &res)
+		{
+			erro = cerr;
+			error_res = res;
+		}
+		http::response<http::string_body> gerar_resposta()
+		{
+			if (erro == "Token nao encontrado!")
+				error_res.result(http::status::unauthorized);
+				error_res.set(http::field::content_type, "application/json");
+				error_res.body() = "Unauthorized";
+
+			return(error_res);
+		}
+	private:
+		std::string erro;
+		http::response<http::string_body> error_res;
+};
+
 void handle_request(http::request<http::string_body> const& req, http::response<http::string_body>& res);
 void do_session(tcp::socket socket);
 std::string generate_jwt(const std::string& user_id, const std::string& company_id, const std::string& permission_level);
