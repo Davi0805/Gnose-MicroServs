@@ -307,10 +307,7 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 				}
 				else
 				{
-					std::cout << GREEN_TEXT << "[REDIS]" << RESET_COLOR << ": dado nao encontrado!" << std::endl;
-					res.result(http::status::internal_server_error);
-					res.set(http::field::content_type, "application/json");
-					res.body() = "Internal Server Error";
+					throw std::runtime_error("Dado do Redis nao encontrado!");
 				}
 			}
 			freeReplyObject(redis_result);

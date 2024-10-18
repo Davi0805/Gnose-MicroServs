@@ -250,7 +250,25 @@ class Error_handler
 				error_res.set(http::field::content_type, "application/json");
 				error_res.body() = erro;
 			}
-			
+			else if (erro == "Falha ao buscar no banco de dados")
+			{
+				error_res.result(http::status::not_found);
+				error_res.set(http::field::content_type, "application/json");
+				error_res.body() = "Not found!";
+			}
+			else if (erro == "Dado do Redis nao encontrado!")
+			{
+				error_res.result(http::status::unauthorized);
+				error_res.set(http::field::content_type, "application/json");
+				error_res.body() = "Unauthorized";
+			}
+			else
+			{
+				error_res.result(http::status::internal_server_error);
+				error_res.set(http::field::content_type, "application/json");
+				error_res.body() = "Internal server error";
+			}
+
 			return(error_res);
 		}
 	private:
