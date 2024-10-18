@@ -197,15 +197,20 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			pqxx::result result = txn.exec_prepared("get_user_data", path_argument);
 
 			if (result.size() == 0)
+			{
+				connection_pool.release(conn);
 				throw std::runtime_error("Usuario nao encontrado!");
-
+			}
 			pqxx::row row = result[0];
 			std::string company = row["company_id"].as<std::string>();
 			std::cout << GREEN_TEXT << "[PERMISSION LEVEL]: " << token_data.permission_level << std::endl;
 			std::cout << GREEN_TEXT << "[DEBUG - COMPANY_ID]" << RESET_COLOR << ": extraido da resposta " << company << " e extraido do jwt_data " << token_data.company_id << std::endl;
 			if (token_data.permission_level != "3" && company != token_data.company_id)
+			{
+				connection_pool.release(conn);
 				throw std::runtime_error(
 					"Usuario nao tem permissao para acessar dados de outra empresa!");
+			}
 
 			json json_result = json::array();
 			for (const auto &row : result)
@@ -227,9 +232,11 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 		}
 		catch (const std::exception &e)
 		{
-			res.result(http::status::bad_request);
+			/* res.result(http::status::bad_request);
 			res.set(http::field::content_type, "application/json");
-			res.body() = "Database error: " + std::string(e.what());
+			res.body() = "Database error: " + std::string(e.what()); */
+			Error_handler Error_handler(std::string(e.what()), res);
+			res = Error_handler.gerar_resposta();
 		}
 	}
 	else if (req.method() == http::verb::post && req.target().to_string().starts_with("/funcionario/")) // REGISTRO DE FUNCIONARIO
@@ -253,8 +260,10 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 			pqxx::result result = txn.exec_prepared("registrando_funcionario", data.username, data.password, data.email, data.first_name, data.last_name, data.permission, token_data.company_id);
 
 			if (result.affected_rows() != 1)
+			{
+				connection_pool.release(conn);
 				throw std::runtime_error("Erro ao adicionar usuario!");
-
+			}
 			txn.commit();
 			connection_pool.release(conn);
 
@@ -264,10 +273,12 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 		}
 		catch (const std::exception &e)
 		{
-			res.result(http::status::bad_request);
+			/* res.result(http::status::bad_request);
 			res.set(http::field::content_type, "application/json");
 			res.body() = "Erro: " + std::string(e.what());
-			std::cerr << e.what() << '\n';
+			std::cerr << e.what() << '\n'; */
+			Error_handler Error_handler(std::string(e.what()), res);
+			res = Error_handler.gerar_resposta();
 		}
 	}
 	else if (req.method() == http::verb::get) // MEU USUARIO
@@ -388,9 +399,11 @@ void handle_request(http::request<http::string_body> const &req, http::response<
 		}
 		catch (const std::exception &e)
 		{
-			res.result(http::status::bad_request);
+			/* res.result(http::status::bad_request);
 			res.set(http::field::content_type, "application/json");
-			res.body() = "Database error: " + std::string(e.what());
+			res.body() = "Database error: " + std::string(e.what()); */
+			Error_handler Error_handler(std::string(e.what()), res);
+			res = Error_handler.gerar_resposta();
 		}
 	}
 	else

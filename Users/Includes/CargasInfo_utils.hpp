@@ -243,30 +243,63 @@ class Error_handler
 			{	error_res.result(http::status::unauthorized);
 				error_res.set(http::field::content_type, "application/json");
 				error_res.body() = "Unauthorized";
+				std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": " << erro << std::endl;
 			}
 			else if (erro == "Falha ao conectar com o redis!")
 			{
 				error_res.result(http::status::internal_server_error);
 				error_res.set(http::field::content_type, "application/json");
 				error_res.body() = erro;
+				std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": " << erro << std::endl;
 			}
 			else if (erro == "Falha ao buscar no banco de dados")
 			{
 				error_res.result(http::status::not_found);
 				error_res.set(http::field::content_type, "application/json");
 				error_res.body() = "Not found!";
+				std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": " << erro << std::endl;
 			}
 			else if (erro == "Dado do Redis nao encontrado!")
 			{
 				error_res.result(http::status::unauthorized);
 				error_res.set(http::field::content_type, "application/json");
 				error_res.body() = "Unauthorized";
+				std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": " << erro << std::endl;
+			}
+			else if (erro == "Erro ao adicionar usuario!")
+			{
+				error_res.result(http::status::bad_request);
+				erro_res.set(http::field::content_type, "application/json");
+				error_res.body() = erro;
+				std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": " << erro << std::endl;
+			}
+			else if (erro == "Usuario nao tem permissao para acessar dados de outra empresa!")
+			{
+				error_res.result(http::status::unauthorized);
+				erro_res.set(http::field::content_type, "application/json");
+				error_res.body() = erro;
+				std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": " << erro << std::endl;
+			}
+			else if (erro == "Usuario nao encontrado!")
+			{
+				error_res.result(http::status::not_found);
+				erro_res.set(http::field::content_type, "application/json");
+				error_res.body() = erro;
+				std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": " << erro << std::endl;
+			}
+			else if (erro == "Sem permissao!")
+			{
+				error_res.result(http::status::unauthorized);
+				erro_res.set(http::field::content_type, "application/json");
+				error_res.body() = erro;
+				std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": " << erro << std::endl;
 			}
 			else
 			{
 				error_res.result(http::status::internal_server_error);
 				error_res.set(http::field::content_type, "application/json");
 				error_res.body() = "Internal server error";
+				std::cout << GREEN_TEXT << "[LOG]" << RESET_COLOR << ": " << erro << std::endl;
 			}
 
 			return(error_res);
